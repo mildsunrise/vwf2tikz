@@ -15,6 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with vwf2tikz.  If not, see <http://www.gnu.org/licenses/>.
 
-from bdf2tikz.bdf2tikz.render import RenderError, render_node_name, render_tikz_text
+from .bdf2tikz.bdf2tikz.render import RenderError, render_node_name, render_tikz_text
 
 # TODO

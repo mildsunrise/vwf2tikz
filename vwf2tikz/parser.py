@@ -16,7 +16,7 @@
 # along with vwf2tikz.  If not, see <http://www.gnu.org/licenses/>.
 
 from pyparsing import ZeroOrMore, Group, Optional, Suppress, Regex, Forward, dblQuotedString, removeQuotes
-from bdf2tikz.bdf2tikz.parser import ParseError
+from .bdf2tikz.bdf2tikz.parser import ParseError
 
 
 # Root parsing

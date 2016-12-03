@@ -1,24 +1,24 @@
 #!/usr/bin/env python
 # Copyright 2016 Alba Mendez <me@alba.sh>
 #
-# This file is part of bdf2tikz.
+# This file is part of vwf2tikz.
 #
-# bdf2tikz is free software: you can redistribute it and/or modify
+# vwf2tikz is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# bdf2tikz is distributed in the hope that it will be useful,
+# vwf2tikz is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with bdf2tikz.  If not, see <http://www.gnu.org/licenses/>.
+# along with vwf2tikz.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
-from bdf2tikz.process import render_bdf, default_options
+from vwf2tikz.process import render_vwf, default_options
 
 rs = open(sys.argv[1],"rb").read()
-output = render_bdf(rs, default_options)
+output = render_vwf(rs, default_options)
 open(sys.argv[2], "w").write(output)
