@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with vwf2tikz.  If not, see <http://www.gnu.org/licenses/>.
 
-from pyparsing import ZeroOrMore, Group, Optional, Suppress, Regex, Forward, dblQuotedString, removeQuotes
+from pyparsing import ZeroOrMore, OneOrMore, Group, Optional, Suppress, Regex, Forward, dblQuotedString, removeQuotes
 from .bdf2tikz.bdf2tikz.parser import ParseError
 
 
@@ -44,7 +44,7 @@ def parse_vwf(input):
     else: break
 
   # Low-level parsing
-  parsed = ZeroOrMore(stanza).parseString(input, parseAll=True).asList()
+  parsed = document.parseString(input, parseAll=True).asList()
 
   # TODO
   return parsed
@@ -66,11 +66,13 @@ class Block(Stanza):
   def __init__(self, field, index, contents):
     self.field = field
     self.index = index
-    self.contents = list(contents)
+    self.contents = contents.asList()
   def __repr__(self):
     s = repr(self.field)
     if self.index != None: s += "[%s]" % repr(self.index)
-    return "Block(%s, %s)" % (s, self.contents)
+    c = "".join(map(lambda x: "%s\n" % repr(x), self.contents))
+    c = "".join("  " + line + "\n" for line in c.splitlines())
+    return "Block(%s) {\n%s}" % (s, c)
   def __str__(self):
     return self.__repr__()
 class Assignment(Stanza):
@@ -78,7 +80,7 @@ class Assignment(Stanza):
     self.field = field
     self.value = value
   def __repr__(self):
-    return "(%s = %s)" % (repr(self.field), repr(self.value))
+    return "Assignment(%s = %s)" % (repr(self.field), repr(self.value))
   def __str__(self):
     return self.__repr__()
 class LevelStatement(Stanza):
@@ -86,7 +88,7 @@ class LevelStatement(Stanza):
     self.level = level
     self.time = time
   def __repr__(self):
-    return "Level(%s, %s)" % (self.level, self.time)
+    return "LevelStatement(%s, %s)" % (self.level, self.time)
   def __str__(self):
     return self.__repr__()
 class Comment(Stanza):
@@ -97,15 +99,15 @@ def _build_parser():
   string = dblQuotedString.setParseAction(removeQuotes)
   integer = Regex(r"-?\d+").setParseAction(lambda t: int(t[0]))
   decimal = Regex(r"-?\d+\.\d*").setParseAction(lambda t: float(t[0]))
-  value = string | integer | decimal | identifier
-  array = (value + ZeroOrMore(Suppress(",") + value)).setParseAction(lambda t: list(t))
+  value = string | decimal | integer | identifier
+  array = (value + OneOrMore(Suppress(",") + value)).setParseAction(tuple)
 
   stanza = Forward()
 
-  block = (identifier + Optional(Suppress("(") + value + Suppress(")")) + \
+  block = (identifier + Optional(Suppress("(") + value + Suppress(")"), default=None) + \
           Group(Suppress("{") + ZeroOrMore(stanza) + Suppress("}"))) \
           .setParseAction(lambda t: Block(*t))
-  assignment = (identifier + Suppress("=") + (value | array) + Suppress(";")) \
+  assignment = (identifier + Suppress("=") + (array | value) + Suppress(";")) \
                .setParseAction(lambda t: Assignment(*t))
   levelStatement = (Suppress("LEVEL") + integer + Suppress("FOR") + decimal + Suppress(";")) \
                    .setParseAction(lambda t: LevelStatement(*t))
@@ -113,6 +115,7 @@ def _build_parser():
   return stanza
 
 stanza = _build_parser()
+document = ZeroOrMore(stanza) + Suppress(";")
 
 
 # Header validation
