@@ -68,21 +68,13 @@ def parse_vwf(input):
   parsed, transition_lists = consume_indexed_blocks(parsed, "TRANSITION_LIST")
   signals = map_signals(signals, transition_lists)
   
-  # Extract display_line tree
+  # Extract DISPLAY_LINE tree
   parsed, display_lines = consume_blocks(parsed, "DISPLAY_LINE")
-  # TODO
+  display_lines = map_display_lines(display_lines)
   
   # Extract time bars
   parsed, time_bars = consume_blocks(parsed, "TIME_BAR")
   # FIXME: validate
-  
-  print header
-  print
-  for n, v in signals.items(): print "%s -> %s" % (n, v)
-  print
-  print display_lines
-  print
-  print time_bars
 
   if len(parsed):
     raise ParseError(u"Unexpected unparsed blocks in VWF:\n%s" % parsed)
@@ -190,7 +182,7 @@ def validate_dictionary(attributes, mandatory_keys, optional_keys, strict=True):
   
   missing_keys = set(mandatory_keys).difference(set(attributes))
   if len(missing_keys):
-    raise ParseError(u"Missing mandatory keys: %s", tuple(missing_keys))
+    raise ParseError(u"Missing mandatory keys: %s" % (tuple(missing_keys), ))
   return attributes
 
 def validate_attributes(block, mandatory_keys, optional_keys, strict=True):
@@ -260,7 +252,18 @@ def validate_header(document):
 
 # Transition list parsing (and flattening)
 
-# TODO
+def convert_level_stanza(stanza):
+  """ Takes a stanza (either a LevelStatement, or a NODE Block) and
+      returns a flattened list of (time, level) values. """
+  if isinstance(stanza, LevelStatement):
+    return [(stanza.time, stanza.level)]
+  
+  assert isinstance(stanza, Block) and stanza.field.s == "NODE" and (stanza.index is None)
+  repeat = stanza.contents.pop(0)
+  assert isinstance(repeat, Assignment) and repeat.field.s == "REPEAT" and isinstance(repeat.value, int)
+  
+  contents = reduce(lambda c, stanza: c + convert_level_stanza(stanza), stanza.contents, [])
+  return contents * repeat.value
 
 
 # Signal to transition list mapping
@@ -313,4 +316,70 @@ def map_signals(signals, transition_lists):
     assert len(transition_list) == 1
     signals[name].transition_list = transition_list[0]
   return signals
+
+
+# DISPLAY_LINE tree mapping
+
+class DisplayLine(object):
+  def __init__(self, channel, radix, expanded, children):
+    """ `channel` is the signal name this display line corresponds to.
+        `expanded` is a boolean determining if children are shown.
+        `children` is a list of DisplayLine children, or None if this is a leaf node. """
+    self.channel = channel
+    self.radix = radix
+    self.expanded = expanded
+    self.children = children
+  def __repr__(self):
+    out = "DisplayLine(%s, %s, expanded=%s)" % (repr(self.channel), self.radix, self.expanded)
+    if not (self.children is None):
+      lines = "".join(str(child) + "\n" for child in self.children)
+      lines = "".join("  " + line for line in lines.splitlines(True))
+      out += " {\n%s}" % lines
+    return out
+  def __str__(self):
+    return self.__repr__()
+
+def map_display_lines(blocks):
+  """ Takes list of block contents (returned by consume_blocks, possibly)
+      and returns list of top-level DisplayLine elements. """
+  # First, parse each block and index in a dictionary so we can locate them faster
+  display_lines = {}
+  top_level_indexes = []
+  for contents in blocks:
+    contents, attributes = consume_attributes(contents)
+    validate_dictionary(attributes, {
+      u"CHANNEL": unicode,
+      u"EXPAND_STATUS": Identifier,
+      u"RADIX": Identifier,
+      u"TREE_INDEX": int,
+      u"TREE_LEVEL": int,
+    }, {
+      u"PARENT": int,
+      u"CHILDREN": tuple,
+    })
+    assert not len(contents)
+    
+    index = attributes[u"TREE_INDEX"]
+    assert index not in display_lines
+    display_lines[index] = attributes
+    if u"PARENT" not in attributes: top_level_indexes.append(index)
+  
+  # Starting from top-level items, recursively convert and remove entries from display_lines
+  def convert(index, expected_parent=None, expected_level=0):
+    attributes = display_lines[index]
+    del display_lines[index]
+    assert attributes[u"TREE_LEVEL"] == expected_level
+    if expected_parent is None: assert u"PARENT" not in attributes
+    else: assert attributes[u"PARENT"] == expected_parent
+    
+    channel = attributes[u"CHANNEL"]
+    radix = attributes[u"RADIX"].s
+    expanded = {u"COLLAPSED": False, u"EXPANDED": True}[attributes[u"EXPAND_STATUS"].s]
+    children = None
+    if u"CHILDREN" in attributes:
+      children = [ convert(child, index, expected_level + 1) for child in attributes[u"CHILDREN"] ]
+    
+    return DisplayLine(channel, radix, expanded, children)
+  
+  return list(map(convert, top_level_indexes))
 
