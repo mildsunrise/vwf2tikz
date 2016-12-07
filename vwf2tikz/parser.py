@@ -16,10 +16,24 @@
 # along with vwf2tikz.  If not, see <http://www.gnu.org/licenses/>.
 
 from pyparsing import ZeroOrMore, OneOrMore, Group, Optional, Suppress, Regex, Forward, dblQuotedString, removeQuotes
-from .bdf2tikz.bdf2tikz.parser import ParseError
+
+class ParseError(Exception):
+  def __init__(self, reason):
+    Exception.__init__(self, u"Malformed VWF file: %s" % (reason,))
+
+# hack for compatibility with python 2.7, sorta
+try: str = unicode
+except: pass
 
 
 # Root parsing
+
+class Document(object):
+  def __init__(self, header, signals, display_lines, time_bars):
+    self.header = header
+    self.signals = signals
+    self.display_lines = display_lines
+    self.time_bars = time_bars
 
 def parse_vwf(input):
   # Decode in ASCII (FIXME)
@@ -46,8 +60,33 @@ def parse_vwf(input):
   # Low-level parsing
   parsed = document.parseString(input, parseAll=True).asList()
 
+  # Extract header
+  header = validate_header(parsed)
+  
+  # Extract signals and transition lists, map them together producing Signal objects
+  parsed, signals = consume_indexed_blocks(parsed, "SIGNAL")
+  parsed, transition_lists = consume_indexed_blocks(parsed, "TRANSITION_LIST")
+  signals = map_signals(signals, transition_lists)
+  
+  # Extract display_line tree
+  parsed, display_lines = consume_blocks(parsed, "DISPLAY_LINE")
   # TODO
-  return parsed
+  
+  # Extract time bars
+  parsed, time_bars = consume_blocks(parsed, "TIME_BAR")
+  # FIXME: validate
+  
+  print header
+  print
+  for n, v in signals.items(): print "%s -> %s" % (n, v)
+  print
+  print display_lines
+  print
+  print time_bars
+
+  if len(parsed):
+    raise ParseError(u"Unexpected unparsed blocks in VWF:\n%s" % parsed)
+  return Document(header, signals, display_lines, time_bars)
 
 
 # Low-level parsing (generic configuration language)
@@ -118,11 +157,160 @@ stanza = _build_parser()
 document = ZeroOrMore(stanza) + Suppress(";")
 
 
+# High-level parsing utilities
+
+def consume_attributes(contents):
+  """ Consumes (removes) Assignment stanzas from a block (among direct children only)
+      and populates a dictionary with the values, leaving any other stanzas untouched. """
+  attributes = {}
+  def filter_stanza(stanza):
+    if isinstance(stanza, Assignment):
+      key, value = stanza.field.s, stanza.value
+      if key in attributes: raise ParseError(u"Duplicate keys found in block:\n%s" % block)
+      attributes[key] = value
+      return False
+    return True
+  contents = filter(filter_stanza, contents)
+  return contents, attributes
+
+def validate_dictionary(attributes, mandatory_keys, optional_keys, strict=True):
+  """ Verifies that a dictionary contains no unknown keys, and that several mandatory
+      keys are present. Also tests for correct value type. If strict is set to False,
+      unknown keys will be tolerated. """
+  for key, value in attributes.items():
+    expected = None
+    if key in mandatory_keys: expected = mandatory_keys[key]
+    elif key in optional_keys: expected = optional_keys[key]
+    
+    if strict and (expected is None):
+      raise ParseError(u"Unknown field %s" % key)
+    if not (expected is None):
+      if not isinstance(value, expected):
+        raise ParseError(u"Field %s has value '%s', expected type %s" % (key, value, expected))
+  
+  missing_keys = set(mandatory_keys).difference(set(attributes))
+  if len(missing_keys):
+    raise ParseError(u"Missing mandatory keys: %s", tuple(missing_keys))
+  return attributes
+
+def validate_attributes(block, mandatory_keys, optional_keys, strict=True):
+  """ Convenience method for consuming attributes from a Block and then validating them. """
+  block.contents, attributes = consume_attributes(block.contents)
+  return validate_dictionary(attributes, mandatory_keys, optional_keys, strict)
+
+def consume_indexed_blocks(contents, name):
+  """ Consumes (removes) Block stanzas with the given name, from a block's direct children.
+      Populates {index: contents} dictionary with removed stanzas. All matching blocks must have string indexes. """
+  blocks = {}
+  def filter_stanza(stanza):
+    if isinstance(stanza, Block):
+      bname, index, contents = stanza.field.s, stanza.index, stanza.contents
+      if bname != name: return True
+      if not isinstance(index, unicode): raise ParseError(u"Expected string index, found %s" % (index,))
+      if index in blocks: raise ParseError(u"Duplicate index: %s" % index)
+      blocks[index] = contents
+      return False
+    return True
+  contents = filter(filter_stanza, contents)
+  return contents, blocks
+
+def consume_blocks(contents, name):
+  """ Consumes (removes) Block stanzas with the given name, from a block's direct children.
+      Returns list of "contents" properties for each removed stanza. All matching blocks must not have indexes. """
+  blocks = []
+  def filter_stanza(stanza):
+    if isinstance(stanza, Block):
+      bname, index, contents = stanza.field.s, stanza.index, stanza.contents
+      if bname != name: return True
+      if not (index is None): raise ParseError(u"Unexpected index on %s block: %s" % (name, index))
+      blocks.append(contents)
+      return False
+    return True
+  contents = filter(filter_stanza, contents)
+  return contents, blocks
+
+
 # Header validation
 
+def validate_header(document):
+  """ Validates and parses a header block. """
+  if len(document) == 0: raise ParseError(u"Document has no stanzas")
+  block = document.pop(0)
+  if not (isinstance(block, Block) and block.field.s == u"HEADER" and block.index is None):
+    raise ParseError(u"First stanza is not a header block:\n%s" % block)
+
+  header = validate_attributes(block, {
+    u"VERSION": int,
+    u"TIME_UNIT": Identifier,
+    u"DATA_OFFSET": float,
+    u"DATA_DURATION": float,
+    u"SIMULATION_TIME": float,
+    u"GRID_PHASE": float,
+    u"GRID_PERIOD": float,
+    u"GRID_DUTY_CYCLE": int,
+  }, {})
+  if len(block.contents): return ParseError(u"Unparsed header contents:\n%s" % block)
+  
+  if not (header[u"VERSION"] == 1 and header[u"TIME_UNIT"].s == u"ns" \
+      and header[u"DATA_OFFSET"] == 0 and header[u"DATA_DURATION"] == header[u"SIMULATION_TIME"] \
+      and header[u"GRID_DUTY_CYCLE"] == 50):
+    return ParseError("Unaccepted header:\n%s" % header)
+  return header
+
+
+# Transition list parsing (and flattening)
+
 # TODO
 
 
-# Actual model
+# Signal to transition list mapping
 
-# TODO
+class Signal(object):
+  def __init__(self, direction, value_type, width, parent):
+    self.direction = direction
+    self.value_type = value_type
+    self.width = width
+    self.parent = parent
+    self.transition_list = None
+  def __repr__(self):
+    return u"Signal(%s, %s, width=%d, parent=%s) [%s]" % (self.direction, self.value_type, self.width, repr(self.parent), repr(self.transition_list))
+  def __str__(self):
+    return self.__repr__()
+
+def parse_signal(name, contents):
+  contents, attributes = consume_attributes(contents)
+  validate_dictionary(attributes, {
+    u"VALUE_TYPE": Identifier,
+    u"SIGNAL_TYPE": Identifier,
+    u"WIDTH": int,
+    u"LSB_INDEX": int,
+    u"DIRECTION": Identifier,
+    u"PARENT": unicode,
+  }, {})
+  assert len(contents) == 0
+  
+  value_type = attributes[u"VALUE_TYPE"].s
+  signal_type = attributes[u"SIGNAL_TYPE"].s
+  width = attributes[u"WIDTH"]
+  lsb_index = attributes[u"LSB_INDEX"]
+  direction = attributes[u"DIRECTION"].s
+  parent = attributes[u"PARENT"]
+  
+  assert value_type in [u"NINE_LEVEL_BIT"]
+  assert {u"SINGLE_BIT": False, u"BUS": True}[signal_type] == (width != 1)
+  assert lsb_index == {u"SINGLE_BIT": -1, u"BUS": 0}[signal_type]
+  assert not (width > 1 and len(parent))
+  assert width > 0
+  if not len(parent): parent = None
+  direction = {u"OUTPUT": "output", u"INPUT": "input", u"BIDIR": "bidir"}[direction]
+  
+  return Signal(direction, value_type, width, parent)
+
+def map_signals(signals, transition_lists):
+  signals = {name: parse_signal(name, contents) for name, contents in signals.items()}
+  for name, transition_list in transition_lists.items():
+    assert name in signals
+    assert len(transition_list) == 1
+    signals[name].transition_list = transition_list[0]
+  return signals
+
