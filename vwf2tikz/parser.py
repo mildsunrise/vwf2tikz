@@ -256,6 +256,8 @@ def convert_level_stanza(stanza):
   """ Takes a stanza (either a LevelStatement, or a NODE Block) and
       returns a flattened list of (time, level) values. """
   if isinstance(stanza, LevelStatement):
+    assert stanza.level in [0, 1]
+    assert stanza.time > 0
     return [(stanza.time, stanza.level)]
   
   assert isinstance(stanza, Block) and stanza.field.s == "NODE" and (stanza.index is None)
@@ -305,7 +307,7 @@ def parse_signal(name, contents):
   assert not (width > 1 and len(parent))
   assert width > 0
   if not len(parent): parent = None
-  direction = {u"OUTPUT": "output", u"INPUT": "input", u"BIDIR": "bidir"}[direction]
+  direction = {u"OUTPUT": u"output", u"INPUT": u"input", u"BIDIR": u"bidir"}[direction]
   
   return Signal(direction, value_type, width, parent)
 
@@ -381,5 +383,7 @@ def map_display_lines(blocks):
     
     return DisplayLine(channel, radix, expanded, children)
   
-  return list(map(convert, top_level_indexes))
+  result = list(map(convert, top_level_indexes))
+  if len(display_lines): raise ParseError(u"There are orphan display lines: %s" % display_lines.values())
+  return result
 

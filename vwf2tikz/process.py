@@ -19,19 +19,28 @@ from . import parser, render
 from .parser import parse_vwf
 
 default_options = {
-  "scale": 1/42.,
+  "scale": 1310000/2, "viewport": False,
+  "time_digits": 3,
 
   "clock_node": "clk", "clock_no_slope": True, "clock_lines": "rising",
-  "unknown_propagate": True,
   "render_grid": False,
 
+  "render_bit_as_bus": False,
+  "render_hex_prefix": True, "render_hex_uppercase": True, "render_hex_zero_padding": True,
+  
+  "disable_propagation_in_binary": True, "join_unknown": True,
+
   "extra_args": [],
-  "custom_render": {},
+  "custom_renderers": {},
 }
 
 def render_vwf(rs, options):
   rs = parse_vwf(rs)
-
-  # TODO
-
+  lines = render.get_rendered_lines(rs.display_lines, options)
+  
+  def render_line(line):
+    name = render.render_line_name(line, options)
+    content = render.render_display_line(line, rs.signals, options)
+    return name + " & " + content + " \\\\\n"
+  output = "".join(map(render_line, lines))
   return output
