@@ -33,6 +33,7 @@ Main features:
  - Optional rendering of the time grid.
  - Customizable number formatting.
  - Hides labels from data nodes that are too small.
+ - Add extra TikZ arguments, global and per-row.
 
 Rendering of time scale grid (using actual units) still a TODO.
 

@@ -33,7 +33,8 @@ default_options = {
   
   "disable_propagation_in_binary": True, "join_unknown": True,
 
-  "extra_args": [],
+  "extra_args": [r"timing/rowdist=4ex"],
+  "custom_styles": {},
   "custom_renderers": {},
 }
 
@@ -42,8 +43,13 @@ def render_vwf(rs, options):
   lines = render.get_rendered_lines(rs.display_lines, options)
   
   def render_line(line):
+    args = []
+    for pattern, value in options["custom_styles"].items():
+      if render.match_node(pattern, line.channel):
+        args += value
     name = render.render_line_name(line, options)
     content = render.render_display_line(line, rs.signals, options)
-    return name + " & " + content + " \\\\\n"
+    return "%s  &  [%s] %s \\\\\n" % (name, ", ".join(args), content)
   output = "".join(map(render_line, lines))
-  return r'\begin{tikztimingtable} %s \end{tikztimingtable}' % output
+  args = ", ".join(options["extra_args"])
+  return r'\begin{tikztimingtable}[%s] %s \end{tikztimingtable}' % (args, output)
