@@ -28,6 +28,9 @@ default_options = {
   "render_bit_as_bus": False,
   "render_hex_prefix": True, "render_hex_uppercase": True, "render_hex_zero_padding": True,
   
+  "render_hide_char_scale": 0.5, "render_hide_char_limit": 8,
+  "render_hide_margin": 0,
+  
   "disable_propagation_in_binary": True, "join_unknown": True,
 
   "extra_args": [],
@@ -43,4 +46,4 @@ def render_vwf(rs, options):
     content = render.render_display_line(line, rs.signals, options)
     return name + " & " + content + " \\\\\n"
   output = "".join(map(render_line, lines))
-  return output
+  return r'\begin{tikztimingtable} %s \end{tikztimingtable}' % output

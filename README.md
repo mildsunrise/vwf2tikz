@@ -31,6 +31,8 @@ Main features:
  - Understands "unknown" states on bits and buses.
  - Customizable rendering for node names (inherited from bdf2tikz).
  - Optional rendering of the time grid.
+ - Customizable number formatting.
+ - Hides labels from data nodes that are too small.
 
 Rendering of time scale grid (using actual units) still a TODO.
 

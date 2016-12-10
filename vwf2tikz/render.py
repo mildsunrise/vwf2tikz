@@ -45,13 +45,12 @@ def crop_level_list(levels, viewport):
   for time, level in levels:
     assert time >= 0
     if start > 0:
-      if start >= time:
-        start -= time
-        continue
-      time -= start
+      start -= time
+      if start >= 0: continue
+      time = -start
     if time > duration: time = duration
     if duration == 0: break
-    result.append((time, level))
+    result.append((float(time), level))
     duration -= time
   return result
 
@@ -178,13 +177,17 @@ def create_renderer(line, config):
     if match_node(pattern, line.channel): return constructor(line, config)
   return NATIVE_RENDERERS[line.radix](line, config)
 
-def render_level(level, renderer, config):
+def render_level(time, level, renderer, config):
   """ Render a level value into a tikz-timing character. """
   mappings = {0: "L", 1: "H"}
   if level in mappings: return mappings[level]
   
   assert isinstance(level, tuple)
-  return "D{%s}" % (renderer(level),)
+  content = renderer(level)
+  length = min(len(content), config["render_hide_char_limit"])
+  length = length * config["render_hide_char_scale"] + config["render_hide_margin"]
+  if time / config["scale"] < length: content = ""
+  return "D{%s}" % (content,)
 
 def create_time_formatter(config):
   scale = config["scale"]
@@ -204,9 +207,10 @@ def render_level_list(level_list, line, config):
     level_list = crop_level_list(level_list, config["viewport"])
   
   # render!
+  print level_list
   renderer = create_renderer(line, config)
   format_time = create_time_formatter(config)
-  return "".join(format_time(time) + render_level(level, renderer, config) for time, level in level_list)
+  return " ".join(format_time(time) + render_level(time, level, renderer, config) for time, level in level_list)
 
 def render_clock_level_list(level_list, line, config):
   # crop if viewport specified in config
@@ -218,12 +222,12 @@ def render_clock_level_list(level_list, line, config):
   # render first level explicitely
   first_time, last_level = level_list.pop(0)
   assert last_level in [0, 1]
-  result = format_time(first_time) + render_level(last_level, None, config)
+  result = format_time(first_time) + render_level(first_time, last_level, None, config)
   
   # render rest of levels
   for time, level in level_list:
     assert level in [0, 1] and level != last_level
-    result += format_time(time) + "C"
+    result += " " + format_time(time) + "C"
     last_level = level
   
   return result
@@ -240,7 +244,15 @@ def render_display_line(line, signals, config):
   
   return render_level_list(level_list, line, config)
 
+
+# Name rendering
+
 def render_line_name(line, config):
   # TODO: maybe fix incomplete names
   return render_node_name(line.channel, {})
+
+
+# Help lines rendering
+
+# TODO
 
