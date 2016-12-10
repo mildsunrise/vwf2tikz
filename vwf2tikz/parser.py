@@ -261,10 +261,10 @@ def convert_level_stanza(stanza):
     return [(stanza.time, stanza.level)]
   
   assert isinstance(stanza, Block) and stanza.field.s == "NODE" and (stanza.index is None)
-  repeat = stanza.contents.pop(0)
+  repeat = stanza.contents[0]
   assert isinstance(repeat, Assignment) and repeat.field.s == "REPEAT" and isinstance(repeat.value, int)
   
-  contents = reduce(lambda c, stanza: c + convert_level_stanza(stanza), stanza.contents, [])
+  contents = reduce(lambda c, stanza: c + convert_level_stanza(stanza), stanza.contents[1:], [])
   return contents * repeat.value
 
 

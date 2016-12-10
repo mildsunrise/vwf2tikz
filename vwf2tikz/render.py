@@ -254,5 +254,18 @@ def render_line_name(line, config):
 
 # Help lines rendering
 
-# TODO
+def get_clock_lines(help_lines, display_lines, signals, config):
+  if not config["clock_lines"]: return
+  target = {"rising": 1, "falling": 0}[config["clock_lines"]]
+  
+  for line in display_lines:
+    if not match_node(config["clock_node"], line.channel): continue
+    # assuming level list is well formed (no consecutive tuples with same level, only 0 and 1)
+    accum_time = 0
+    for time, level in get_level_list(line, signals):
+      if level == target: help_lines.add(accum_time)
+      accum_time += time
 
+def render_help_lines(help_lines, config):
+  arg = ",".join(map(lambda t: create_time_formatter(config)(t), help_lines))
+  return "\\vertlines[help lines]{%s}" % arg

@@ -49,7 +49,18 @@ def render_vwf(rs, options):
         args += value
     name = render.render_line_name(line, options)
     content = render.render_display_line(line, rs.signals, options)
-    return "%s  &  [%s] %s \\\\\n" % (name, ", ".join(args), content)
+    return "  %s  &  [%s] %s \\\\\n" % (name, ", ".join(args), content)
   output = "".join(map(render_line, lines))
+  
   args = ", ".join(options["extra_args"])
-  return r'\begin{tikztimingtable}[%s] %s \end{tikztimingtable}' % (args, output)
+  extra_code = ""
+  
+  help_lines = set()
+  render.get_clock_lines(help_lines, lines, rs.signals, options)
+  # FIXME: render_grid feature
+  if len(help_lines):
+    help_lines = render.render_help_lines(sorted(help_lines), options)
+    extra_code += "  \\begin{pgfonlayer}{background}\n    %s\n  \\end{pgfonlayer}\n" % help_lines
+  
+  return '\\begin{tikztimingtable}[%s]\n%s\\extracode\n%s\\end{tikztimingtable}\n' % (args, output, extra_code)
+
