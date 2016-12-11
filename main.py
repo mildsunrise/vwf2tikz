@@ -17,8 +17,10 @@
 # along with vwf2tikz.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
+from vwf2tikz.parser import parse_vwf
 from vwf2tikz.process import render_vwf, default_options
 
 rs = open(sys.argv[1],"rb").read()
+rs = parse_vwf(rs)
 output = render_vwf(rs, default_options)
 open(sys.argv[2], "w").write(output)

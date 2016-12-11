@@ -19,7 +19,7 @@ from . import parser, render
 from .parser import parse_vwf
 
 default_options = {
-  "scale": 1310000/2, "viewport": False,
+  "scale": 1310000/4, "viewport": False,# (1310000*52, 1310000*52 + 1310000/4*35),
   "time_digits": 3,
 
   "clock_node": "clk", "clock_no_slope": True, "clock_lines": "rising",
@@ -39,7 +39,6 @@ default_options = {
 }
 
 def render_vwf(rs, options):
-  rs = parse_vwf(rs)
   lines = render.get_rendered_lines(rs.display_lines, options)
   
   def render_line(line):
