@@ -207,7 +207,6 @@ def render_level_list(level_list, line, config):
     level_list = crop_level_list(level_list, config["viewport"])
   
   # render!
-  print level_list
   renderer = create_renderer(line, config)
   format_time = create_time_formatter(config)
   return " ".join(format_time(time) + render_level(time, level, renderer, config) for time, level in level_list)
