@@ -266,5 +266,8 @@ def get_clock_lines(help_lines, display_lines, signals, config):
       accum_time += time
 
 def render_help_lines(help_lines, config):
+  if config["viewport"]:
+    start, end = config["viewport"]
+    help_lines = (t - start for t in filter(lambda t: start < t < end, help_lines))
   arg = ",".join(map(lambda t: create_time_formatter(config)(t), help_lines))
   return "\\vertlines[help lines]{%s}" % arg
