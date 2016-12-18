@@ -101,6 +101,53 @@ def render_bit_string(line, config):
 
 NATIVE_RENDERERS["Binary"] = render_bit_string
 
+def render_ascii(line, config):
+  SPECIAL = ur'''
+NUL
+SOH
+STX
+ETX
+EOT
+ENQ
+ACK
+BEL
+BS
+HT
+LF
+VT
+FF
+CR
+SO
+SI
+DLE
+DC1
+DC2
+DC3
+DC4
+NAK
+SYN
+ETB
+CAN
+EM
+S2
+ESC
+FS
+GS
+RS
+US
+  '''.strip().splitlines()
+  def represent(i):
+    assert i < 128
+    if i < len(SPECIAL):
+      return SPECIAL[i]
+    if i == 127:
+      return "DEL"
+    return "'%c'" % i
+  mapping = {i: represent(i) for i in xrange(128)}
+  return lambda x: mapping[bits_to_int(x)]
+
+NATIVE_RENDERERS["ASCII"] = render_ascii
+
 
 # Determine which display lines to actually render, and node matching logic
 
