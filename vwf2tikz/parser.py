@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with vwf2tikz.  If not, see <http://www.gnu.org/licenses/>.
 
-from pyparsing import ZeroOrMore, OneOrMore, Group, Optional, Suppress, Regex, Forward, dblQuotedString, removeQuotes
+from pyparsing import ZeroOrMore, OneOrMore, Group, Optional, Suppress, Regex, Forward, QuotedString
 
 class ParseError(Exception):
   def __init__(self, reason):
@@ -127,7 +127,7 @@ class Comment(Stanza):
 
 def _build_parser():
   identifier = Regex(r"[A-Za-z]+(_[A-Za-z]+)*").setParseAction(lambda t: Identifier(t[0]))
-  string = dblQuotedString.setParseAction(removeQuotes)
+  string = QuotedString('"', unquoteResults=True, multiline=True) # FIXME: escaping?
   integer = Regex(r"-?\d+").setParseAction(lambda t: int(t[0]))
   decimal = Regex(r"-?\d+\.\d*").setParseAction(lambda t: float(t[0]))
   value = string | decimal | integer | identifier
@@ -240,7 +240,9 @@ def validate_header(document):
     u"GRID_PHASE": float,
     u"GRID_PERIOD": float,
     u"GRID_DUTY_CYCLE": int,
-  }, {})
+  }, {
+    u"PRINT_OPTIONS": unicode,
+  })
   if len(block.contents): return ParseError(u"Unparsed header contents:\n%s" % block)
   
   if not (header[u"VERSION"] == 1 and header[u"TIME_UNIT"].s == u"ns" \
