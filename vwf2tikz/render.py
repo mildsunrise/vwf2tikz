@@ -252,6 +252,8 @@ def render_level_list(level_list, line, config):
   # crop if viewport specified in config
   if config["viewport"]:
     level_list = crop_level_list(level_list, config["viewport"])
+
+  if not len(level_list): return ""
   
   # render!
   renderer = create_renderer(line, config)
@@ -264,6 +266,7 @@ def render_clock_level_list(level_list, line, config):
     level_list = crop_level_list(level_list, config["viewport"])
   
   format_time = create_time_formatter(config)
+  if not len(level_list): return ""
   
   # render first level explicitely
   first_time, last_level = level_list.pop(0)
