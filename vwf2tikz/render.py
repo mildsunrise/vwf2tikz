@@ -214,7 +214,7 @@ def prepare_level_list(level_list, line, config):
     if not isinstance(v, tuple): return v
     # FIXME propagate / join unknowns, honoring config
     return v
-  level_list = list(map(map_value, level_list))
+  level_list = list((t, map_value(v)) for t, v in level_list)
   
   return level_list
 
