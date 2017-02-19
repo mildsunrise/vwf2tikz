@@ -132,6 +132,7 @@ def _build_parser():
   decimal = Regex(r"-?\d+\.\d*").setParseAction(lambda t: float(t[0]))
   value = string | decimal | integer | identifier
   array = (value + OneOrMore(Suppress(",") + value)).setParseAction(tuple)
+  levelValue = integer | Regex(r"[X]")
 
   stanza = Forward()
 
@@ -140,7 +141,7 @@ def _build_parser():
           .setParseAction(lambda t: Block(*t))
   assignment = (identifier + Suppress("=") + (array | value) + Suppress(";")) \
                .setParseAction(lambda t: Assignment(*t))
-  levelStatement = (Suppress("LEVEL") + integer + Suppress("FOR") + decimal + Suppress(";")) \
+  levelStatement = (Suppress("LEVEL") + levelValue + Suppress("FOR") + decimal + Suppress(";")) \
                    .setParseAction(lambda t: LevelStatement(*t))
   stanza << (block | assignment | levelStatement)
   return stanza
@@ -258,7 +259,7 @@ def convert_level_stanza(stanza):
   """ Takes a stanza (either a LevelStatement, or a NODE Block) and
       returns a flattened list of (time, level) values. """
   if isinstance(stanza, LevelStatement):
-    assert stanza.level in [0, 1]
+    assert stanza.level in [0, 1, "X"]
     assert stanza.time > 0
     return [(stanza.time, stanza.level)]
   

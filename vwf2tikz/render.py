@@ -212,7 +212,7 @@ def prepare_level_list(level_list, line, config):
   # propagate unknown values
   def map_value(v):
     if not isinstance(v, tuple): return v
-    # FIXME propagate / join unknowns, honoring config
+    if "X" in v: return "X" # FIXME: honor config
     return v
   level_list = list((t, map_value(v)) for t, v in level_list)
   
@@ -226,7 +226,7 @@ def create_renderer(line, config):
 
 def render_level(time, level, renderer, config):
   """ Render a level value into a tikz-timing character. """
-  mappings = {0: "L", 1: "H"}
+  mappings = {0: "L", 1: "H", "X": "U"}
   if level in mappings: return mappings[level]
   
   assert isinstance(level, tuple)
