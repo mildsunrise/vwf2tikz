@@ -76,6 +76,10 @@ def parse_vwf(input):
   parsed, time_bars = consume_blocks(parsed, "TIME_BAR")
   # FIXME: validate
 
+  # Extract groups
+  parsed, groups = consume_indexed_blocks(parsed, "GROUP")
+  # FIXME: validate, use in some way?
+
   if len(parsed):
     raise ParseError(u"Unexpected unparsed blocks in VWF:\n%s" % parsed)
   return Document(header, signals, display_lines, time_bars)
