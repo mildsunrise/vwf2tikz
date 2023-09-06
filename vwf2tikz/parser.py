@@ -15,15 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with vwf2tikz.  If not, see <http://www.gnu.org/licenses/>.
 
+from functools import reduce
 from pyparsing import ZeroOrMore, OneOrMore, Group, Optional, Suppress, Regex, Forward, QuotedString
 
 class ParseError(Exception):
   def __init__(self, reason):
-    Exception.__init__(self, u"Malformed VWF file: %s" % (reason,))
-
-# hack for compatibility with python 2.7, sorta
-try: str = unicode
-except: pass
+    Exception.__init__(self, "Malformed VWF file: %s" % (reason,))
 
 
 # Root parsing
@@ -39,20 +36,20 @@ def parse_vwf(input):
   # Decode in ASCII (FIXME)
   try:
     input = input.decode("ascii")
-  except UnicodeDecodeError as e:
-    raise ParseError(u"Non-ASCII content")
+  except DecodeError as e:
+    raise ParseError("Non-ASCII content")
 
   # Remove starting comments, if present
   while True:
     input = input.lstrip()
-    if input.startswith(u"/*"):
+    if input.startswith("/*"):
       input = input[2:]
-      idx = input.find(u"*/")
-      if idx == -1: raise ParseError(u"Unterminated comment")
+      idx = input.find("*/")
+      if idx == -1: raise ParseError("Unterminated comment")
       input = input[idx+2:]
-    elif input.startswith(u"//"):
+    elif input.startswith("//"):
       input = input[2:]
-      idx = input.find(u"\n")
+      idx = input.find("\n")
       if idx == -1: idx = len(input)
       input = input[idx+1:]
     else: break
@@ -81,7 +78,7 @@ def parse_vwf(input):
   # FIXME: validate, use in some way?
 
   if len(parsed):
-    raise ParseError(u"Unexpected unparsed blocks in VWF:\n%s" % parsed)
+    raise ParseError("Unexpected unparsed blocks in VWF:\n%s" % parsed)
   return Document(header, signals, display_lines, time_bars)
 
 
@@ -163,11 +160,11 @@ def consume_attributes(contents):
   def filter_stanza(stanza):
     if isinstance(stanza, Assignment):
       key, value = stanza.field.s, stanza.value
-      if key in attributes: raise ParseError(u"Duplicate keys found in block:\n%s" % block)
+      if key in attributes: raise ParseError("Duplicate keys found in block:\n%s" % block)
       attributes[key] = value
       return False
     return True
-  contents = filter(filter_stanza, contents)
+  contents = list(filter(filter_stanza, contents))
   return contents, attributes
 
 def validate_dictionary(attributes, mandatory_keys, optional_keys, strict=True):
@@ -180,14 +177,14 @@ def validate_dictionary(attributes, mandatory_keys, optional_keys, strict=True):
     elif key in optional_keys: expected = optional_keys[key]
     
     if strict and (expected is None):
-      raise ParseError(u"Unknown field %s" % key)
+      raise ParseError("Unknown field %s" % key)
     if not (expected is None):
       if not isinstance(value, expected):
-        raise ParseError(u"Field %s has value '%s', expected type %s" % (key, value, expected))
-  
+        raise ParseError("Field %s has value '%s', expected type %s" % (key, value, expected))
+
   missing_keys = set(mandatory_keys).difference(set(attributes))
   if len(missing_keys):
-    raise ParseError(u"Missing mandatory keys: %s" % (tuple(missing_keys), ))
+    raise ParseError("Missing mandatory keys: %s" % (tuple(missing_keys), ))
   return attributes
 
 def validate_attributes(block, mandatory_keys, optional_keys, strict=True):
@@ -203,12 +200,12 @@ def consume_indexed_blocks(contents, name):
     if isinstance(stanza, Block):
       bname, index, contents = stanza.field.s, stanza.index, stanza.contents
       if bname != name: return True
-      if not isinstance(index, unicode): raise ParseError(u"Expected string index, found %s" % (index,))
-      if index in blocks: raise ParseError(u"Duplicate index: %s" % index)
+      if not isinstance(index, str): raise ParseError("Expected string index, found %s" % (index,))
+      if index in blocks: raise ParseError("Duplicate index: %s" % index)
       blocks[index] = contents
       return False
     return True
-  contents = filter(filter_stanza, contents)
+  contents = list(filter(filter_stanza, contents))
   return contents, blocks
 
 def consume_blocks(contents, name):
@@ -219,11 +216,11 @@ def consume_blocks(contents, name):
     if isinstance(stanza, Block):
       bname, index, contents = stanza.field.s, stanza.index, stanza.contents
       if bname != name: return True
-      if not (index is None): raise ParseError(u"Unexpected index on %s block: %s" % (name, index))
+      if not (index is None): raise ParseError("Unexpected index on %s block: %s" % (name, index))
       blocks.append(contents)
       return False
     return True
-  contents = filter(filter_stanza, contents)
+  contents = list(filter(filter_stanza, contents))
   return contents, blocks
 
 
@@ -231,28 +228,28 @@ def consume_blocks(contents, name):
 
 def validate_header(document):
   """ Validates and parses a header block. """
-  if len(document) == 0: raise ParseError(u"Document has no stanzas")
+  if len(document) == 0: raise ParseError("Document has no stanzas")
   block = document.pop(0)
-  if not (isinstance(block, Block) and block.field.s == u"HEADER" and block.index is None):
-    raise ParseError(u"First stanza is not a header block:\n%s" % block)
+  if not (isinstance(block, Block) and block.field.s == "HEADER" and block.index is None):
+    raise ParseError("First stanza is not a header block:\n%s" % block)
 
   header = validate_attributes(block, {
-    u"VERSION": int,
-    u"TIME_UNIT": Identifier,
-    u"DATA_OFFSET": float,
-    u"DATA_DURATION": float,
-    u"SIMULATION_TIME": float,
-    u"GRID_PHASE": float,
-    u"GRID_PERIOD": float,
-    u"GRID_DUTY_CYCLE": int,
+    "VERSION": int,
+    "TIME_UNIT": Identifier,
+    "DATA_OFFSET": float,
+    "DATA_DURATION": float,
+    "SIMULATION_TIME": float,
+    "GRID_PHASE": float,
+    "GRID_PERIOD": float,
+    "GRID_DUTY_CYCLE": int,
   }, {
-    u"PRINT_OPTIONS": unicode,
+    "PRINT_OPTIONS": str,
   })
-  if len(block.contents): return ParseError(u"Unparsed header contents:\n%s" % block)
-  
-  if not (header[u"VERSION"] == 1 and header[u"TIME_UNIT"].s == u"ns" \
-      and header[u"DATA_OFFSET"] == 0 and header[u"DATA_DURATION"] == header[u"SIMULATION_TIME"] \
-      and header[u"GRID_DUTY_CYCLE"] == 50):
+  if len(block.contents): return ParseError("Unparsed header contents:\n%s" % block)
+
+  if not (header["VERSION"] == 1 and header["TIME_UNIT"].s == "ns" \
+      and header["DATA_OFFSET"] == 0 and header["DATA_DURATION"] == header["SIMULATION_TIME"] \
+      and header["GRID_DUTY_CYCLE"] == 50):
     return ParseError("Unaccepted header:\n%s" % header)
   return header
 
@@ -285,37 +282,37 @@ class Signal(object):
     self.parent = parent
     self.transition_list = None
   def __repr__(self):
-    return u"Signal(%s, %s, width=%d, parent=%s) [%s]" % (self.direction, self.value_type, self.width, repr(self.parent), repr(self.transition_list))
+    return "Signal(%s, %s, width=%d, parent=%s) [%s]" % (self.direction, self.value_type, self.width, repr(self.parent), repr(self.transition_list))
   def __str__(self):
     return self.__repr__()
 
 def parse_signal(name, contents):
   contents, attributes = consume_attributes(contents)
   validate_dictionary(attributes, {
-    u"VALUE_TYPE": Identifier,
-    u"SIGNAL_TYPE": Identifier,
-    u"WIDTH": int,
-    u"LSB_INDEX": int,
-    u"DIRECTION": Identifier,
-    u"PARENT": unicode,
+    "VALUE_TYPE": Identifier,
+    "SIGNAL_TYPE": Identifier,
+    "WIDTH": int,
+    "LSB_INDEX": int,
+    "DIRECTION": Identifier,
+    "PARENT": str,
   }, {})
   assert len(contents) == 0
-  
-  value_type = attributes[u"VALUE_TYPE"].s
-  signal_type = attributes[u"SIGNAL_TYPE"].s
-  width = attributes[u"WIDTH"]
-  lsb_index = attributes[u"LSB_INDEX"]
-  direction = attributes[u"DIRECTION"].s
-  parent = attributes[u"PARENT"]
-  
-  assert value_type in [u"NINE_LEVEL_BIT"]
-  assert {u"SINGLE_BIT": False, u"BUS": True}[signal_type] == (width != 1)
-  assert lsb_index == {u"SINGLE_BIT": -1, u"BUS": 0}[signal_type]
+
+  value_type = attributes["VALUE_TYPE"].s
+  signal_type = attributes["SIGNAL_TYPE"].s
+  width = attributes["WIDTH"]
+  lsb_index = attributes["LSB_INDEX"]
+  direction = attributes["DIRECTION"].s
+  parent = attributes["PARENT"]
+
+  assert value_type in ["NINE_LEVEL_BIT"]
+  assert {"SINGLE_BIT": False, "BUS": True}[signal_type] == (width != 1)
+  assert lsb_index == {"SINGLE_BIT": -1, "BUS": 0}[signal_type]
   assert not (width > 1 and len(parent))
   assert width > 0
   if not len(parent): parent = None
-  direction = {u"OUTPUT": u"output", u"INPUT": u"input", u"BIDIR": u"bidir"}[direction]
-  
+  direction = {"OUTPUT": "output", "INPUT": "input", "BIDIR": "bidir"}[direction]
+
   return Signal(direction, value_type, width, parent)
 
 def map_signals(signals, transition_lists):
@@ -357,40 +354,40 @@ def map_display_lines(blocks):
   for contents in blocks:
     contents, attributes = consume_attributes(contents)
     validate_dictionary(attributes, {
-      u"CHANNEL": unicode,
-      u"EXPAND_STATUS": Identifier,
-      u"RADIX": Identifier,
-      u"TREE_INDEX": int,
-      u"TREE_LEVEL": int,
+      "CHANNEL": str,
+      "EXPAND_STATUS": Identifier,
+      "RADIX": Identifier,
+      "TREE_INDEX": int,
+      "TREE_LEVEL": int,
     }, {
-      u"PARENT": int,
-      u"CHILDREN": tuple,
+      "PARENT": int,
+      "CHILDREN": tuple,
     })
     assert not len(contents)
-    
-    index = attributes[u"TREE_INDEX"]
+
+    index = attributes["TREE_INDEX"]
     assert index not in display_lines
     display_lines[index] = attributes
-    if u"PARENT" not in attributes: top_level_indexes.append(index)
-  
+    if "PARENT" not in attributes: top_level_indexes.append(index)
+
   # Starting from top-level items, recursively convert and remove entries from display_lines
   def convert(index, expected_parent=None, expected_level=0):
     attributes = display_lines[index]
     del display_lines[index]
-    assert attributes[u"TREE_LEVEL"] == expected_level
-    if expected_parent is None: assert u"PARENT" not in attributes
-    else: assert attributes[u"PARENT"] == expected_parent
-    
-    channel = attributes[u"CHANNEL"]
-    radix = attributes[u"RADIX"].s
-    expanded = {u"COLLAPSED": False, u"EXPANDED": True}[attributes[u"EXPAND_STATUS"].s]
+    assert attributes["TREE_LEVEL"] == expected_level
+    if expected_parent is None: assert "PARENT" not in attributes
+    else: assert attributes["PARENT"] == expected_parent
+
+    channel = attributes["CHANNEL"]
+    radix = attributes["RADIX"].s
+    expanded = {"COLLAPSED": False, "EXPANDED": True}[attributes["EXPAND_STATUS"].s]
     children = None
-    if u"CHILDREN" in attributes:
-      children = [ convert(child, index, expected_level + 1) for child in attributes[u"CHILDREN"] ]
-    
+    if "CHILDREN" in attributes:
+      children = [ convert(child, index, expected_level + 1) for child in attributes["CHILDREN"] ]
+
     return DisplayLine(channel, radix, expanded, children)
   
   result = list(map(convert, top_level_indexes))
-  if len(display_lines): raise ParseError(u"There are orphan display lines: %s" % display_lines.values())
+  if len(display_lines): raise ParseError("There are orphan display lines: %s" % display_lines.values())
   return result
 

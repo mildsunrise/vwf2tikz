@@ -16,6 +16,7 @@
 # along with vwf2tikz.  If not, see <http://www.gnu.org/licenses/>.
 
 import types
+from functools import reduce
 from .bdf2tikz.bdf2tikz.render import RenderError, render_node_name, render_tikz_text
 from . import parser
 
@@ -102,7 +103,7 @@ def render_bit_string(line, config):
 NATIVE_RENDERERS["Binary"] = render_bit_string
 
 def render_ascii(line, config):
-  SPECIAL = ur'''
+  SPECIAL = r'''
 NUL
 SOH
 STX
@@ -143,7 +144,7 @@ US
     if i == 127:
       return "DEL"
     return "'%c'" % i
-  mapping = {i: represent(i) for i in xrange(128)}
+  mapping = {i: represent(i) for i in range(128)}
   return lambda x: mapping[bits_to_int(x)]
 
 NATIVE_RENDERERS["ASCII"] = render_ascii
@@ -164,7 +165,7 @@ def get_rendered_lines(display_lines, config):
 def match_node(pattern, node):
   """ Generic function to match a config option (i.e. clock_node)
       with a node name. Returns True if positive match. """
-  if isinstance(pattern, str) or isinstance(pattern, unicode):
+  if isinstance(pattern, str) or isinstance(pattern, str):
     return pattern == node
   if isinstance(pattern, tuple) or isinstance(pattern, list):
     return node in pattern
